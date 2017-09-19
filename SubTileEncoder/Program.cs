@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using BitMiracle.LibTiff.Classic;
 
 namespace SubTileEncoder {
 
@@ -170,38 +171,65 @@ namespace SubTileEncoder {
       /// <summary>
       /// liest die Höhendaten ein
       /// </summary>
-      /// <param name="txtfile"></param>
+      /// <param name="file"></param>
       /// <param name="tilewidth"></param>
       /// <param name="tileheight"></param>
       /// <param name="minheight"></param>
       /// <param name="maxheight"></param>
       /// <returns></returns>
-      static List<int> ReadData(string txtfile, out int tilewidth, out int tileheight, out int minheight, out int maxheight) {
+      static List<int> ReadData(string file, out int tilewidth, out int tileheight, out int minheight, out int maxheight) {
+         List<int> heights = new List<int>();
+
+         if (file.Contains(".tif"))
+            heights = ReadDataFromTiff(file, out tilewidth, out tileheight, out minheight, out maxheight);
+         else
+            heights = ReadDataFromText(file, out tilewidth, out tileheight, out minheight, out maxheight);
+
+         return heights;
+      }
+
+
+      /// <summary>
+      /// Reads the data from text.
+      /// </summary>
+      /// <returns>The data from csv.</returns>
+      /// <param name="txtfile">Txtfile.</param>
+      /// <param name="tilewidth">Tilewidth.</param>
+      /// <param name="tileheight">Tileheight.</param>
+      /// <param name="minheight">Minheight.</param>
+      /// <param name="maxheight">Maxheight.</param>
+      static List<int> ReadDataFromText(string txtfile, out int tilewidth, out int tileheight, out int minheight, out int maxheight)
+      {
          List<int> heights = new List<int>();
          tilewidth = -1;
          tileheight = 0;
          maxheight = int.MinValue;
          minheight = int.MaxValue;
 
-         try {
+         try
+         {
             String txt = null;
-            using (StreamReader sr = new StreamReader(txtfile)) {
+            using (StreamReader sr = new StreamReader(txtfile))
+            {
                txt = sr.ReadToEnd();
             }
             string[] lines = txt.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-            foreach (string line in lines) {
+            foreach (string line in lines)
+            {
                string[] sData = line.Split(new char[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
 
                if (tilewidth < 0) // 1. Datenzeile gibt die Breite vor
                   tilewidth = sData.Length;
-               else {
+               else
+               {
                   if (tilewidth != sData.Length)
                      throw new Exception("Die Datenanzahl (" + sData.Length.ToString() + ") in Datenzeile " + (tileheight + 1).ToString() + " ist nicht identisch zur 1. Zeile (" + tilewidth.ToString() + ").");
                }
                tileheight++;
 
-               for (int i = 0; i < sData.Length; i++) {
+               for (int i = 0; i < sData.Length; i++)
+               {
                   int val = Convert.ToInt32(sData[i].Trim());
                   if (val < 0)
                      throw new Exception("Es können nur Werte >= 0 verwendet werden.");
@@ -210,9 +238,54 @@ namespace SubTileEncoder {
                   heights.Add(val);
                }
             }
-         } catch (Exception e) {
+         }
+         catch (Exception e)
+         {
             Console.WriteLine("Die Datei '" + txtfile + "' konnte nicht gelesen werden:");
             Console.WriteLine(e.Message);
+         }
+
+         return heights;
+      }
+
+
+      /// <summary>
+      /// Reads the data from tiff.
+      /// </summary>
+      /// <returns>The data from tiff.</returns>
+      /// <param name="file">File.</param>
+      /// <param name="tilewidth">Tilewidth.</param>
+      /// <param name="tileheight">Tileheight.</param>
+      /// <param name="minheight">Minheight.</param>
+      /// <param name="maxheight">Maxheight.</param>
+      static List<int> ReadDataFromTiff(string file, out int tilewidth, out int tileheight, out int minheight, out int maxheight)
+      {
+         List<int> heights = new List<int>();
+         Tiff tiff = null;
+         tilewidth = -1;
+         tileheight = 0;
+         maxheight = int.MinValue;
+         minheight = int.MaxValue;
+
+         try{
+            tiff = Tiff.Open(file, "r");
+            tilewidth = tiff.GetField(TiffTag.IMAGEWIDTH)[0].ToInt();
+            tileheight = tiff.GetField(TiffTag.IMAGELENGTH)[0].ToInt();
+
+            byte[] buffer = new byte[tiff.StripSize()];
+            int rtn = tiff.ReadEncodedStrip(0, buffer, 0, buffer.Length);
+            Console.WriteLine("ReadTile:{0}", rtn);
+
+            for (int i = 0; i < buffer.Length; i+=2){
+               int val = BitConverter.ToInt16(buffer, i);
+
+               minheight = Math.Min(minheight, val);
+               maxheight = Math.Max(maxheight, val);
+               heights.Add(val);
+            }
+
+         }catch(Exception e){
+            Console.WriteLine("{0}", e.ToString());
          }
 
          return heights;

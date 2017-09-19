@@ -3,4 +3,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <StartArguments>p:\Programmierung\!Privat\Gis\Garmin\GarminNeu\DEM-Test\Testkarte\Subtiles\undef2_ 0 0 1 true</StartArguments>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(RunConfiguration)' == 'OnLinux' ">
+    <StartAction>Project</StartAction>
+    <StartArguments>../../cut_gdalwarp_40_35.tif</StartArguments>
+  </PropertyGroup>
 </Project>
